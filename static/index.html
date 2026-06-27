@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT RAG Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+/* ── Tokens ─────────────────────────────────────────────── */
+:root {
+  --bg:         #0f0f0f;
+  --surface:    #1a1a1a;
+  --surface2:   #242424;
+  --border:     #2e2e2e;
+  --text:       #e8e8e8;
+  --muted:      #737373;
+  --red:        #ff0000;
+  --red-dim:    #cc0000;
+  --red-glow:   rgba(255,0,0,0.12);
+
+  --font:       'Inter', system-ui, sans-serif;
+  --mono:       'JetBrains Mono', monospace;
+
+  --ease:       cubic-bezier(0.16, 1, 0.3, 1);
+  --dur:        200ms;
+}
+
+/* ── Reset ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button { cursor: pointer; border: none; background: none; font: inherit; color: inherit; }
+input, textarea { font: inherit; color: inherit; background: none; border: none; outline: none; resize: none; }
+a { color: var(--red); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── View switcher ──────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: flex; }
+
+/* ══════════════════════════════════════════════════════════
+   LANDING VIEW
+══════════════════════════════════════════════════════════ */
+#view-landing {
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Red radial background glow behind the icon */
+.landing-glow {
+  position: absolute;
+  right: -5%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 55%;
+  height: 90%;
+  background: radial-gradient(ellipse at 60% 50%,
+    rgba(180,0,0,0.55) 0%,
+    rgba(120,0,0,0.25) 35%,
+    transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1140px;
+  width: 100%;
+  padding: 3rem 4rem;
+  position: relative;
+  z-index: 1;
+  gap: 3rem;
+}
+
+/* ── Left column ── */
+.landing-left { flex: 1; min-width: 0; }
+
+/* Brand row */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 2rem;
+}
+.brand-icon {
+  width: 38px;
+  height: auto;
+  flex-shrink: 0;
+}
+.brand-icon .yt-bg { fill: var(--red); }
+.brand-icon .yt-play { fill: #fff; }
+.brand-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  white-space: nowrap;
+}
+.brand-rag { color: var(--red); }
+
+/* Headline */
+.landing-headline {
+  font-size: clamp(2.6rem, 5.5vw, 4.2rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.0;
+  margin-bottom: 1.25rem;
+  color: var(--text);
+}
+.hl-red { color: var(--red); }
+
+/* Subtext */
+.landing-sub {
+  color: var(--muted);
+  font-size: 1rem;
+  margin-bottom: 2.5rem;
+  font-weight: 400;
+  line-height: 1.6;
+  max-width: 440px;
+}
+
+/* URL form */
+.url-form { display: flex; flex-direction: column; gap: 0.65rem; max-width: 480px; }
+
+.url-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1c1c1c;
+  border: 1.5px solid #353535;
+  border-radius: 8px;
+  padding: 0.7rem 1rem;
+  transition: border-color var(--dur) var(--ease);
+}
+.url-input-wrap:focus-within { border-color: #555; }
+
+.url-icon { color: #555; flex-shrink: 0; width: 18px; height: 18px; }
+.url-input {
+  flex: 1;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: none;
+}
+.url-input::placeholder { color: #484848; }
+
+.btn-analyze {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  letter-spacing: -0.01em;
+  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.btn-analyze:hover:not(:disabled) { background: #e60000; transform: translateY(-1px); }
+.btn-analyze:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-sparkle { font-style: normal; font-size: 1em; }
+
+.landing-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+.hint-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  flex-shrink: 0;
+}
+
+/* ── Right column — YouTube logo image ── */
+.landing-right {
+  flex: 0 0 40%;
+  max-width: 440px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yt-hero-img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  mix-blend-mode: lighten;
+}
+
+/* Responsive */
+@media (max-width: 860px) {
+  .landing-inner { flex-direction: column; padding: 3rem 2rem; }
+  .landing-right { display: none; }
+  .landing-glow  { display: none; }
+}
+@media (max-width: 480px) {
+  .landing-inner { padding: 2rem 1.25rem; }
+  .landing-headline { font-size: 2.2rem; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   PROCESSING VIEW
+══════════════════════════════════════════════════════════ */
+#view-processing {
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.process-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+.process-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2rem;
+}
+.process-brand svg { width: 28px; height: 20px; color: var(--red); }
+.process-video-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}
+
+.process-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+}
+
+.stages { display: flex; flex-direction: column; gap: 0; }
+
+.stage-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+  animation: reveal-stage 0.25s var(--ease) both;
+}
+.stage-row:last-child { border-bottom: 1px solid var(--border); }
+
+@keyframes reveal-stage {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  margin-top: 4px;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+.stage-dot.active {
+  border-color: var(--red);
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red-glow);
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+.stage-dot.done {
+  border-color: #22c55e;
+  background: #22c55e;
+  animation: none;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.stage-text { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+.stage-text.active { color: var(--text); }
+.stage-text.done   { color: var(--muted); }
+
+.process-note {
+  margin-top: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 300;
+  line-height: 1.6;
+}
+
+/* ══════════════════════════════════════════════════════════
+   CHAT VIEW
+══════════════════════════════════════════════════════════ */
+#view-chat {
+  height: 100vh;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.sidebar-top {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sidebar-top svg { width: 22px; height: 16px; color: var(--red); flex-shrink: 0; }
+.sidebar-appname {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.sidebar-video {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-video-title {
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sidebar-meta {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.btn-new-video {
+  display: block;
+  width: calc(100% - 2rem);
+  margin: 0.75rem 1rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+  transition: border-color var(--dur), color var(--dur);
+}
+.btn-new-video:hover { border-color: var(--text); color: var(--text); }
+
+.sidebar-history-label {
+  padding: 0.5rem 1rem 0.25rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sidebar-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0 1rem;
+}
+.sidebar-history::-webkit-scrollbar { width: 3px; }
+.sidebar-history::-webkit-scrollbar-thumb { background: var(--border); }
+
+.history-item {
+  padding: 0.45rem 1rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur), background var(--dur);
+  border-left: 2px solid transparent;
+}
+.history-item:hover { color: var(--text); background: var(--surface); }
+.history-item.active { color: var(--text); border-left-color: var(--red); }
+
+/* Chat main */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.chat-topbar {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.chat-topbar-title {
+  font-size: 0.8rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-topbar-meta {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+
+/* Messages */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  scroll-behavior: smooth;
+}
+.messages::-webkit-scrollbar { width: 4px; }
+.messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Empty state */
+.messages-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-align: center;
+  gap: 0.5rem;
+}
+.messages-empty svg { width: 40px; height: 28px; color: var(--border); margin-bottom: 0.5rem; }
+.messages-empty h3 { font-size: 0.9rem; font-weight: 500; color: var(--muted); }
+.messages-empty p  { font-size: 0.78rem; }
+
+/* Message rows */
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  animation: msg-in 0.2s var(--ease) both;
+  max-width: 780px;
+  width: 100%;
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg-user { align-self: flex-end; align-items: flex-end; }
+.msg-ai   { align-self: flex-start; align-items: flex-start; }
+
+.msg-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 2px;
+}
+
+.msg-bubble {
+  padding: 0.75rem 1rem;
+  line-height: 1.65;
+  font-size: 0.875rem;
+}
+
+.msg-user .msg-bubble {
+  background: var(--surface);
+  color: var(--text);
+  border-left: 2px solid var(--border);
+}
+
+.msg-ai .msg-bubble {
+  background: transparent;
+  color: var(--text);
+  border-left: 2px solid var(--red);
+  padding-left: 1rem;
+}
+
+/* Markdown inside AI bubble */
+.msg-bubble p  { margin-bottom: 0.65rem; }
+.msg-bubble p:last-child { margin-bottom: 0; }
+.msg-bubble ol, .msg-bubble ul { padding-left: 1.25rem; margin-bottom: 0.65rem; }
+.msg-bubble li { margin-bottom: 0.3rem; }
+.msg-bubble code {
+  font-family: var(--mono);
+  font-size: 0.8em;
+  background: var(--surface2);
+  padding: 0.1em 0.35em;
+  border-radius: 2px;
+  color: #e5c07b;
+}
+.msg-bubble pre {
+  background: var(--surface2);
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 0.65rem 0;
+  border-left: 2px solid var(--border);
+}
+.msg-bubble pre code { background: none; padding: 0; color: #abb2bf; }
+.msg-bubble strong { color: #fff; font-weight: 500; }
+
+/* Timestamp chips */
+.ts-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 0.72em;
+  background: var(--surface2);
+  color: var(--red);
+  padding: 0.1em 0.45em;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  vertical-align: middle;
+  transition: background var(--dur), border-color var(--dur);
+  white-space: nowrap;
+}
+.ts-chip:hover { background: var(--red-glow); border-color: var(--red); text-decoration: none; }
+.ts-chip svg { width: 9px; height: 9px; }
+
+/* Stage indicator inside AI message */
+.stage-indicator {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stage-indicator::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  animation: pulse-dot 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* Typing cursor */
+.cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--red);
+  vertical-align: text-bottom;
+  animation: blink-cursor 0.8s step-end infinite;
+  margin-left: 1px;
+}
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Sources section */
+.sources-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.sources-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+/* Error bubble */
+.msg-error .msg-bubble {
+  border-left-color: #f87171;
+  color: #f87171;
+}
+
+/* Input bar */
+.input-bar {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.35rem;
+  transition: border-color var(--dur);
+}
+.input-wrap:focus-within { border-color: var(--red); }
+
+.chat-input {
+  flex: 1;
+  font-size: 0.875rem;
+  color: var(--text);
+  max-height: 120px;
+  line-height: 1.5;
+}
+.chat-input::placeholder { color: var(--muted); }
+
+.btn-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--red);
+  color: #fff;
+  flex-shrink: 0;
+  transition: background var(--dur), transform var(--dur);
+}
+.btn-send:hover:not(:disabled) { background: var(--red-dim); transform: scale(1.05); }
+.btn-send:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .sidebar { display: none; }
+  .chat-topbar-meta { display: none; }
+  .messages { padding: 1rem; }
+  .input-bar { padding: 0.75rem 1rem; }
+}
+
+/* ── Scrollbar global ───────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<!-- ══ LANDING ════════════════════════════════════════════ -->
+<div id="view-landing" class="view active">
+  <div class="landing-glow"></div>
+
+  <div class="landing-inner">
+    <!-- Left: content -->
+    <div class="landing-left">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 17" xmlns="http://www.w3.org/2000/svg" aria-label="YouTube">
+          <path class="yt-bg" d="M23.495 2.659A3.016 3.016 0 0 0 21.373.537C19.505.032 12 .032 12 .032S4.495.032 2.627.537A3.016 3.016 0 0 0 .505 2.659C0 4.527 0 8.421 0 8.421s0 3.895.505 5.762a3.016 3.016 0 0 0 2.122 2.122C4.495 16.81 12 16.81 12 16.81s7.505 0 9.373-.505a3.016 3.016 0 0 0 2.122-2.122C24 12.316 24 8.421 24 8.421s0-3.894-.505-5.762z"/>
+          <path class="yt-play" d="M9.545 12V4.842L15.818 8.42 9.545 12z"/>
+        </svg>
+        <span class="brand-name">YouTube <span class="brand-rag">RAG</span> Chatbot</span>
+      </div>
+
+      <h1 class="landing-headline">Chat with any <br><span class="hl-red">YouTube</span> video.</h1>
+      <p class="landing-sub">Paste a YouTube URL — the transcript is analyzed locally using your Ollama models.</p>
+
+      <form class="url-form" id="url-form">
+        <div class="url-input-wrap">
+          <svg class="url-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M6.354 5.5H4a3 3 0 0 0 0 6h3a3 3 0 0 0 2.83-4H9c-.086 0-.17.01-.25.031A2 2 0 0 1 7 10.5H4a2 2 0 1 1 0-4h1.535c.218-.376.495-.714.82-1z"/><path d="M9 5.5a3 3 0 0 0-2.83 4h1.098A2 2 0 0 1 9 6.5h3a2 2 0 1 1 0 4h-1.535a4.02 4.02 0 0 1-.82 1H12a3 3 0 1 0 0-6H9z"/></svg>
+          <input
+            id="url-input"
+            class="url-input"
+            type="url"
+            placeholder="https://www.youtube.com/watch?v=..."
+            autocomplete="off"
+            spellcheck="false"
+            required
+          >
+        </div>
+        <button class="btn-analyze" id="btn-analyze" type="submit">
+          <em class="btn-sparkle">✦</em>
+          Analyze Video
+        </button>
+        <p class="landing-hint">
+          <span class="hint-dot"></span>
+          Requires Ollama running at localhost:11434
+        </p>
+      </form>
+    </div>
+
+    <!-- Right: YouTube logo image -->
+    <div class="landing-right">
+      <img class="yt-hero-img" src="static\yt-logo.png" alt="YouTube 3D Logo">
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROCESSING ═════════════════════════════════════════ -->
+<div id="view-processing" class="view">
+  <div class="process-card">
+    <div class="process-brand">
+      <svg viewBox="0 0 24 17" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M23.495 2.659A3.016 3.016 0 0 0 21.373.537C19.505.032 12 .032 12 .032S4.495.032 2.627.537A3.016 3.016 0 0 0 .505 2.659C0 4.527 0 8.421 0 8.421s0 3.895.505 5.762a3.016 3.016 0 0 0 2.122 2.122C4.495 16.81 12 16.81 12 16.81s7.505 0 9.373-.505a3.016 3.016 0 0 0 2.122-2.122C24 12.316 24 8.421 24 8.421s0-3.894-.505-5.762zM9.545 12V4.842L15.818 8.42 9.545 12z"/>
+      </svg>
+      <div class="process-video-title" id="process-video-title">Connecting…</div>
+    </div>
+    <p class="process-label">Processing pipeline</p>
+    <div class="stages" id="stages"></div>
+    <p class="process-note">Embedding may take several minutes for long videos.<br>The session persists — ask as many questions as you like.</p>
+  </div>
+</div>
+
+<!-- ══ CHAT ═══════════════════════════════════════════════ -->
+<div id="view-chat" class="view">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <svg viewBox="0 0 24 17" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M23.495 2.659A3.016 3.016 0 0 0 21.373.537C19.505.032 12 .032 12 .032S4.495.032 2.627.537A3.016 3.016 0 0 0 .505 2.659C0 4.527 0 8.421 0 8.421s0 3.895.505 5.762a3.016 3.016 0 0 0 2.122 2.122C4.495 16.81 12 16.81 12 16.81s7.505 0 9.373-.505a3.016 3.016 0 0 0 2.122-2.122C24 12.316 24 8.421 24 8.421s0-3.894-.505-5.762zM9.545 12V4.842L15.818 8.42 9.545 12z"/>
+      </svg>
+      <span class="sidebar-appname">YT RAG Chat</span>
+    </div>
+    <div class="sidebar-video">
+      <div class="sidebar-video-title" id="sb-video-title"></div>
+      <div class="sidebar-meta" id="sb-video-meta"></div>
+    </div>
+    <button class="btn-new-video" id="btn-new-video">+ New Video</button>
+    <div class="sidebar-history-label">This session</div>
+    <div class="sidebar-history" id="sidebar-history"></div>
+  </aside>
+
+  <!-- Main chat area -->
+  <div class="chat-main">
+    <div class="chat-topbar">
+      <div class="chat-topbar-title" id="topbar-title"></div>
+      <div class="chat-topbar-meta" id="topbar-meta"></div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="messages-empty" id="messages-empty">
+        <svg viewBox="0 0 24 17" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M23.495 2.659A3.016 3.016 0 0 0 21.373.537C19.505.032 12 .032 12 .032S4.495.032 2.627.537A3.016 3.016 0 0 0 .505 2.659C0 4.527 0 8.421 0 8.421s0 3.895.505 5.762a3.016 3.016 0 0 0 2.122 2.122C4.495 16.81 12 16.81 12 16.81s7.505 0 9.373-.505a3.016 3.016 0 0 0 2.122-2.122C24 12.316 24 8.421 24 8.421s0-3.894-.505-5.762zM9.545 12V4.842L15.818 8.42 9.545 12z"/>
+        </svg>
+        <h3>Video ready</h3>
+        <p>Ask anything about this video.</p>
+      </div>
+    </div>
+
+    <div class="input-bar">
+      <div class="input-wrap">
+        <textarea
+          id="chat-input"
+          class="chat-input"
+          placeholder="Ask a question about the video…"
+          rows="1"
+        ></textarea>
+      </div>
+      <button class="btn-send" id="btn-send" disabled title="Send (Enter)">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11zM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────
+let sessionId   = null;
+let videoId     = null;
+let videoTitle  = '';
+let streaming   = false;
+let chatHistory = [];   // [{role, text}]
+
+// Stage config for processing view
+const STAGE_DEFS = [
+  { key: 'lang_detect',  label: 'Detecting subtitle language' },
+  { key: 'download',     label: 'Downloading subtitles' },
+  { key: 'subs_loaded',  label: 'Loading subtitle file' },
+  { key: 'chunking',     label: 'Chunking transcript' },
+  { key: 'embedding',    label: 'Building vector index' },
+  { key: 'indexing',     label: 'Building BM25 keyword index' },
+];
+
+// ─── View helpers ────────────────────────────────────────────
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ─── SSE via fetch + ReadableStream ─────────────────────────
+async function streamPost(url, body, onEvent) {
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const parts = buf.split('\n\n');
+    buf = parts.pop();
+    for (const part of parts) {
+      if (part.startsWith('data: ')) {
+        try { onEvent(JSON.parse(part.slice(6))); } catch {}
+      }
+    }
+  }
+}
+
+// ─── Timestamp chip ─────────────────────────────────────────
+function tsToSeconds(ts) {
+  const clean = ts.trim().split(',')[0];
+  const parts = clean.split(':').map(Number);
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + Math.floor(parts[2]);
+  if (parts.length === 2) return parts[0] * 60 + Math.floor(parts[1]);
+  return 0;
+}
+
+function makeTimestampChip(startStr, endStr, vid) {
+  const sec = tsToSeconds(startStr);
+  const ytUrl = `https://www.youtube.com/watch?v=${vid}&t=${sec}`;
+  return `<a class="ts-chip" href="${ytUrl}" target="_blank" rel="noopener">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M6.271 5.055a.5.5 0 0 1 .52.038L11 7.5 6.79 9.907a.5.5 0 0 1-.79-.407V5.5a.5.5 0 0 1 .271-.445z"/></svg>
+    ${startStr.split(',')[0]}
+  </a>`;
+}
+
+function linkTimestamps(html, vid) {
+  // Match [HH:MM:SS,mmm - HH:MM:SS,mmm] or [HH:MM:SS - HH:MM:SS]
+  return html.replace(
+    /\[(\d{2}:\d{2}:\d{2}(?:,\d+)?)\s*[-–]\s*(\d{2}:\d{2}:\d{2}(?:,\d+)?)\]/g,
+    (_, s, e) => makeTimestampChip(s, e, vid)
+  );
+}
+
+// ─── Render markdown + timestamp chips ──────────────────────
+function renderMarkdown(text, vid) {
+  const raw = marked.parse(text, { breaks: true, gfm: true });
+  return vid ? linkTimestamps(raw, vid) : raw;
+}
+
+// ─── Auto-grow textarea ──────────────────────────────────────
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ─── Scroll to bottom of messages ───────────────────────────
+function scrollBottom() {
+  const el = document.getElementById('messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ─── Add user message ────────────────────────────────────────
+function addUserMessage(text) {
+  const msgs = document.getElementById('messages');
+  msgs.innerHTML = '';
+  const div  = document.createElement('div');
+  div.className = 'msg msg-user';
+  div.innerHTML = `
+    <div class="msg-label">You</div>
+    <div class="msg-bubble">${escHtml(text)}</div>
+  `;
+  msgs.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+// ─── Add AI message (streaming) ──────────────────────────────
+function addAIMessage() {
+  const msgs = document.getElementById('messages');
+  const div  = document.createElement('div');
+  div.className = 'msg msg-ai';
+  div.innerHTML = `
+    <div class="msg-label">Answer</div>
+    <div class="stage-indicator" id="ai-stage-indicator">Processing…</div>
+    <div class="msg-bubble" id="ai-bubble" style="display:none"></div>
+  `;
+  msgs.appendChild(div);
+  scrollBottom();
+  return div;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Update sidebar history ──────────────────────────────────
+function updateHistory() {
+  const el = document.getElementById('sidebar-history');
+  el.innerHTML = '';
+  chatHistory.forEach((turn, i) => {
+    if (turn.role !== 'user') return;
+    const item = document.createElement('div');
+    item.className = 'history-item' + (i === chatHistory.length - 2 ? ' active' : '');
+    item.textContent = turn.text;
+    item.onclick = () => {
+      const msgs = document.getElementById('messages');
+      const allMsgs = msgs.querySelectorAll('.msg');
+      const idx = Math.floor(i / 2);
+      if (allMsgs[idx]) allMsgs[idx].scrollIntoView({ behavior: 'smooth' });
+    };
+    el.appendChild(item);
+  });
+}
+
+// ─── Process video ───────────────────────────────────────────
+async function processVideo(url) {
+  showView('view-processing');
+  document.getElementById('process-video-title').textContent = 'Connecting…';
+  document.getElementById('stages').innerHTML = '';
+
+  const stageEls = {};
+
+  function addStage(key, text, state) {
+    const el = document.createElement('div');
+    el.className = 'stage-row';
+    el.innerHTML = `
+      <div class="stage-dot ${state}" id="dot-${key}"></div>
+      <div class="stage-text ${state}" id="txt-${key}">${escHtml(text)}</div>
+    `;
+    document.getElementById('stages').appendChild(el);
+    stageEls[key] = el;
+  }
+
+  function setStage(key, state, text) {
+    const dot = document.getElementById(`dot-${key}`);
+    const txt = document.getElementById(`txt-${key}`);
+    if (!dot) return;
+    dot.className = `stage-dot ${state}`;
+    txt.className = `stage-text ${state}`;
+    if (text) txt.textContent = text;
+  }
+
+  function activateStage(key) {
+    // Mark all previous stages done
+    Object.keys(stageEls).forEach(k => {
+      if (k !== key) setStage(k, 'done');
+    });
+    if (stageEls[key]) setStage(key, 'active');
+  }
+
+  try {
+    await streamPost('/api/process', { url }, (event) => {
+      switch (event.type) {
+        case 'stage': {
+          const key = event.stage;
+          if (!stageEls[key]) addStage(key, event.msg, 'active');
+          else setStage(key, 'active', event.msg);
+          activateStage(key);
+          const titleEl = document.getElementById('process-video-title');
+          if (titleEl.textContent === 'Connecting…') titleEl.textContent = 'Processing…';
+          break;
+        }
+        case 'ready': {
+          sessionId  = event.session_id;
+          videoId    = event.video_id;
+          videoTitle = event.video_title;
+
+          // Mark all stages done
+          Object.keys(stageEls).forEach(k => setStage(k, 'done'));
+          document.getElementById('process-video-title').textContent = videoTitle;
+
+          // Populate chat UI
+          document.getElementById('sb-video-title').textContent   = videoTitle;
+          document.getElementById('sb-video-meta').innerHTML      =
+            `${event.video_id}<br>${event.chunk_count} chunks`;
+          document.getElementById('topbar-title').textContent     = videoTitle;
+          document.getElementById('topbar-meta').textContent      = `${event.chunk_count} chunks`;
+          document.getElementById('btn-send').disabled            = false;
+
+          setTimeout(() => showView('view-chat'), 400);
+          break;
+        }
+        case 'error':
+          document.getElementById('process-video-title').textContent = 'Error: ' + event.message;
+          break;
+      }
+    });
+  } catch (err) {
+    document.getElementById('process-video-title').textContent = 'Error: ' + err.message;
+  }
+}
+
+// ─── Send question ───────────────────────────────────────────
+async function sendQuestion(query) {
+  if (!query.trim() || !sessionId || streaming) return;
+
+  streaming = true;
+  const sendBtn  = document.getElementById('btn-send');
+  const inputEl  = document.getElementById('chat-input');
+  sendBtn.disabled = true;
+  inputEl.disabled = true;
+
+  chatHistory.push({ role: 'user', text: query });
+  addUserMessage(query);
+  updateHistory();
+
+  const aiDiv   = addAIMessage();
+  const stageEl = document.getElementById('ai-stage-indicator');
+  const bubble  = document.getElementById('ai-bubble');
+  let rawText   = '';
+  let sources   = [];
+
+  try {
+    await streamPost('/api/ask', { session_id: sessionId, query }, (event) => {
+      switch (event.type) {
+        case 'stage':
+          stageEl.textContent = event.msg;
+          scrollBottom();
+          break;
+
+        case 'sources':
+          sources = event.chunks || [];
+          break;
+
+        case 'token':
+          stageEl.style.display = 'none';
+          bubble.style.display = 'block';
+          rawText += event.text;
+          bubble.innerHTML = renderMarkdown(rawText, videoId) + '<span class="cursor"></span>';
+          scrollBottom();
+          break;
+
+        case 'done': {
+          stageEl.remove();
+          bubble.style.display = 'block';
+          bubble.innerHTML = renderMarkdown(rawText, videoId);
+
+          // Append sources row
+          if (sources.length > 0) {
+            const row = document.createElement('div');
+            row.className = 'sources-row';
+            row.innerHTML = '<div class="sources-label">Sources</div>';
+            sources.forEach(c => {
+              row.innerHTML += makeTimestampChip(c.start_time, c.end_time, c.video_id);
+            });
+            bubble.appendChild(row);
+          }
+
+          chatHistory.push({ role: 'ai', text: rawText });
+          updateHistory();
+          scrollBottom();
+          break;
+        }
+
+        case 'error':
+          stageEl.remove();
+          aiDiv.className = 'msg msg-ai msg-error';
+          bubble.style.display = 'block';
+          bubble.textContent = event.message;
+          break;
+      }
+    });
+  } catch (err) {
+    stageEl.remove();
+    bubble.style.display = 'block';
+    bubble.textContent = 'Connection error: ' + err.message;
+  }
+
+  streaming = false;
+  sendBtn.disabled = false;
+  inputEl.disabled = false;
+  inputEl.focus();
+  scrollBottom();
+}
+
+// ─── Event listeners ─────────────────────────────────────────
+document.getElementById('url-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) return;
+  document.getElementById('btn-analyze').disabled = true;
+  await processVideo(url);
+  document.getElementById('btn-analyze').disabled = false;
+});
+
+document.getElementById('btn-new-video').addEventListener('click', () => {
+  sessionId   = null;
+  videoId     = null;
+  videoTitle  = '';
+  chatHistory = [];
+  document.getElementById('messages').innerHTML =
+    `<div class="messages-empty" id="messages-empty">
+      <svg viewBox="0 0 24 17" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23.495 2.659A3.016 3.016 0 0 0 21.373.537C19.505.032 12 .032 12 .032S4.495.032 2.627.537A3.016 3.016 0 0 0 .505 2.659C0 4.527 0 8.421 0 8.421s0 3.895.505 5.762a3.016 3.016 0 0 0 2.122 2.122C4.495 16.81 12 16.81 12 16.81s7.505 0 9.373-.505a3.016 3.016 0 0 0 2.122-2.122C24 12.316 24 8.421 24 8.421s0-3.894-.505-5.762zM9.545 12V4.842L15.818 8.42 9.545 12z"/></svg>
+      <h3>Video ready</h3><p>Ask anything about this video.</p>
+    </div>`;
+  document.getElementById('url-input').value = '';
+  document.getElementById('sidebar-history').innerHTML = '';
+  document.getElementById('btn-send').disabled = true;
+  showView('view-landing');
+});
+
+const chatInput = document.getElementById('chat-input');
+chatInput.addEventListener('input', function() { autoGrow(this); });
+chatInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const q = this.value.trim();
+    if (!q) return;
+    this.value = '';
+    autoGrow(this);
+    sendQuestion(q);
+  }
+});
+
+document.getElementById('btn-send').addEventListener('click', () => {
+  const q = chatInput.value.trim();
+  if (!q) return;
+  chatInput.value = '';
+  autoGrow(chatInput);
+  sendQuestion(q);
+});
+</script>
+</body>
+</html>
