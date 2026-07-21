@@ -1,0 +1,13 @@
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+numpy
+pysrt
+yt-dlp
+langchain-core
+langchain-ollama
+rank-bm25
+sentence-transformers
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
