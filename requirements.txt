@@ -8,6 +8,3 @@ yt-dlp
 langchain-core
 langchain-ollama
 rank-bm25
-sentence-transformers
---extra-index-url https://download.pytorch.org/whl/cpu
-torch

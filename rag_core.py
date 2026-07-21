@@ -28,7 +28,7 @@ RERANK_MODEL    = "Krakekai/qwen3-reranker-8b"
 ANSWER_MODEL    = "gemma4:31b-cloud"
 OLLAMA_BASE_URL = "http://localhost:11434"
 
-USE_CROSS_ENCODER_RERANKER = True
+USE_CROSS_ENCODER_RERANKER = False
 CROSS_ENCODER_MODEL        = "BAAI/bge-reranker-v2-m3"
 
 CHUNK_SECONDS              = 75
