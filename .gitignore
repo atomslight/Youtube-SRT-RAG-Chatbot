@@ -1,9 +1,0 @@
-__pycache__/
-*.py[cod]
-*$py.class
-server.log
-retrieved_chunks/
-.venv/
-venv/
-ENV/
-env/
